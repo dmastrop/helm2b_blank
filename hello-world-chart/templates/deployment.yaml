@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+# this is basically a standard deployment.yaml k8s file except for the curly brackets
+# these are dynamic and get installed when we run helm install or upgrade
+
+metadata:
+  name: {{ include "hello-world-chart.fullname" . }}
+  labels:
+    {{- include "hello-world-chart.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "hello-world-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "hello-world-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "hello-world-chart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          # for example the container image. The image will be piped into default and if no data will default to AppVersion in the Chart.yaml file
+          # these values are like the - - set that we used in the helm upgrade command
+          # another way to pass values is through the values.yaml file in the outer tree directory
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- toYaml .Values.environment | nindent 12 }}
+            # toYaml function converts text passed to it to valid yaml syntax.  nindent will do the indentation in the yaml 
+          ports:
+            - name: http
+              #containerPort: {{ .Values.service.port }}
+              # changed this to 8080 in the values.yaml file under service and then port (ClusterIP)
+              # for production this will be 80 and LoadBalancer.
+              #commented out the variable here. The values.yaml should not be used. We are using separate yamls for the ports for dev and qa and prod
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              #port: http
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /
+              #port: http
+              port: 8080
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
